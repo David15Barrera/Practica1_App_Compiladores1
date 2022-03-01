@@ -1,0 +1,144 @@
+package analisis;
+
+import java_cup.runtime.Symbol;
+import analisis.AnalizadorLexico;
+import Reportes.TablaDeErrores;
+import graficos.TablaDeGraficas;
+import Reportes.TablaDeOcurrenvias;
+
+parser code
+	{:
+	    /*---------------------------------------CODIGO EJECUTABLE--------------------------------------------*/
+    public parser(AnalizadorLexico lexer) {
+            super(lexer);
+    }
+    public void syntax_error(Symbol s) {
+            tabla.agregarError(String.valueOf(s.value), s.left, s.right, "Sintactico", "Error de Sintaxis, se esperaba otro token");
+        }
+
+    private TablaDeErrores tabla = new TablaDeErrores();
+    private TablaDeGraficas graficas = new TablaDeGraficas();
+    private TablaDeOcurrencias ocurrencias = new TablaDeOcurrencias();
+
+    public void setTabla(TablaDeErrores tabla){
+            this.tabla = tabla;
+    }
+
+    public void setTablaDeOcurrencias(TablaDeOcurrencias ocurrencias){
+                this.ocurrencias = ocurrencias;
+        }
+
+    public void setGraficas(TablaDeGraficas graficas){
+                this.graficas = graficas;
+        }
+
+:};
+
+terminal SUMA, RESTA, MULTIPLICACION, DIVISION, PARENTESIS_A, PARENTESIS_C, DOS_PUNTOS, PUNTO_COMA,
+    LLAVE_A, LLAVE_C, CORCHETE_A, CORCHETE_C, COMA, SIGNO_IGUAL, DEF, BARRAS, PIE, TITULO, EJEX, EJEY, ETIQUETAS, VALORES,
+    UNIR, TIPO, TOTAL, EXTRA, EJECUTAR, ERROR;
+terminal Double ENTERO, DECIMAL;
+terminal String CADENA, CANTIDAD, PORCENTAJE;
+
+
+	    /*---------------------------------------DECLARACION DE LOS NO-TERMINALES--------------------------------------------*/
+
+non terminal s, s1, s2, s3, s4,s5, s6, s7, s8, s9, s10, s13;
+non terminal String s11;
+non terminal Double expresion, s12;
+precedence left SUMA, RESTA;
+precedence left MULTIPLICACION, DIVISION;
+
+start with s;
+
+s ::=
+    DEF s1 s
+    | DEF s2 s
+    | s13 s
+    | // epsilon
+    | error PUNTO_COMA
+    | error LLAVE_C
+;
+
+s1 ::=
+    BARRAS:b LLAVE_A s3 LLAVE_C {: graficas.agregarGrafica(1, bleft, bright);:}
+;
+
+s2 ::=
+    PIE:p LLAVE_A s10 LLAVE_C {: graficas.agregarGrafica(2, pleft, pright);:}
+;
+
+s3 ::=
+    TITULO DOS_PUNTOS CADENA:c PUNTO_COMA s3 {: graficas.agregarTexto(c, 1, cleft, cright); :}
+    | EJEX:x DOS_PUNTOS CORCHETE_A s4 CORCHETE_C PUNTO_COMA s3  {:graficas.asignarCadenas(1,xleft,xright);:}
+    | EJEY:y DOS_PUNTOS CORCHETE_A s6 CORCHETE_C PUNTO_COMA s3  {: graficas.asignarNumeros(1, yleft, yright); :}
+    | UNIR:u DOS_PUNTOS CORCHETE_A s8 CORCHETE_C PUNTO_COMA s3  {: graficas.asignarUniones(1, uleft, uright); :}
+    | // epsilon
+;
+
+s4 ::=
+    CADENA:cadena s5  {: graficas.agregarCadenas(cadena); :}
+    | CADENA:cadena  {: graficas.agregarCadenas(cadena); :}
+;
+
+s5 ::=
+    COMA s4
+;
+
+s6 ::=
+    expresion:e s7 {:RESULT = e; graficas.agregarNumeros(e);:}
+    | expresion:e  {:RESULT = e; graficas.agregarNumeros(e);:}
+;
+
+s7 ::=
+    COMA s6
+;
+
+s8 ::=
+   LLAVE_A ENTERO:entero1 COMA ENTERO:entero2 LLAVE_C s9 {:graficas.agregarEntero(entero1, entero2); :}
+   | LLAVE_A ENTERO:entero1 COMA ENTERO:entero2 LLAVE_C {: graficas.agregarEntero(entero1, entero2);:}
+;
+
+s9 ::=
+    COMA s8
+;
+
+s10 ::=
+    TITULO DOS_PUNTOS CADENA:c PUNTO_COMA s10 {: graficas.agregarTexto(c, 2, cleft, cright); :}
+    | TIPO DOS_PUNTOS s11:c PUNTO_COMA s10    {: graficas.agregarTexto(c, 3, cleft, cright); :}
+   	| ETIQUETAS:x DOS_PUNTOS CORCHETE_A s4 CORCHETE_C PUNTO_COMA s10 {:graficas.asignarCadenas(2,xleft,xright);:}
+    | VALORES:y DOS_PUNTOS CORCHETE_A s6 CORCHETE_C PUNTO_COMA s10 {: graficas.asignarNumeros(2, yleft, yright); :}
+   	| TOTAL DOS_PUNTOS expresion:e PUNTO_COMA s10 {:RESULT = e; graficas.asignarTotal(e, eleft, eright);:}
+    | UNIR:u DOS_PUNTOS CORCHETE_A s8 CORCHETE_C PUNTO_COMA s10 {: graficas.asignarUniones(2, uleft, uright); :}
+    | EXTRA DOS_PUNTOS CADENA:c PUNTO_COMA s10 {: graficas.agregarTexto(c, 4, cleft, cright); :}
+    | // epsilon
+;
+
+s11 ::=
+    CANTIDAD:c {:RESULT = c;:}
+    | PORCENTAJE:c {:RESULT = c;:}
+;
+
+s12 ::=
+    ENTERO:n {:RESULT = n;:}
+    | DECIMAL:d {:RESULT = d;:}
+;
+
+s13 ::=
+    EJECUTAR PARENTESIS_A CADENA:c PARENTESIS_C PUNTO_COMA {:graficas.agregarEjecucion(c, cleft, cright); :}
+;
+expresion ::=
+           s12:n {: RESULT = n; :}
+        | expresion:e1 SUMA:o expresion:e2
+                    {: RESULT = e1 + e2; ocurrencias.agregarOcurrencia("Suma", oleft, oright, e1 + " + " + e2);:}
+        | expresion:e1 RESTA:o expresion:e2
+                    {: RESULT = e1 - e2; ocurrencias.agregarOcurrencia("Resta", oleft, oright, e1 + " - " + e2);:}
+        | expresion:e1 MULTIPLICACION:o expresion:e2
+                    {: RESULT = e1 * e2; ocurrencias.agregarOcurrencia("Multiplicacion", oleft, oright, e1 + " * " + e2);:}
+        | expresion:e1 DIVISION:o expresion:e2
+                    {: RESULT = e1 / e2; ocurrencias.agregarOcurrencia("Division", oleft, oright, e1 + " / " + e2);:}
+        | RESTA expresion:e
+                    {:RESULT = 0 - e;:}
+        | PARENTESIS_A expresion:e PARENTESIS_C
+                    {:RESULT = e;:}
+;
